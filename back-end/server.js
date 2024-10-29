@@ -28,12 +28,12 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
     const before = dateTimeToTimestamp(beforeDateTimeStr);
 
     let allCandleData = [];
-    let nextBatchStart = after;
+    let nextBatchStart = before;
 
-    while (nextBatchStart < before) {
+    while (nextBatchStart > after) {
         await wait(waitTime); // Wait for the specified time
 
-        const url = `https://www.okx.com/api/v5/market/history-mark-price-candles?instId=${instId}&bar=${bar}&after=${before}`;
+        const url = `https://www.okx.com/api/v5/market/history-mark-price-candles?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=300`;
         console.log(url);
         const response = await axios.get(url);
         const candles = response.data.data;
@@ -50,7 +50,7 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
             "close": candle[4],
             "volume": candle[5]
         })));
-
+        //break;
         nextBatchStart = parseInt(candles[candles.length - 1][0]);
     }
 
@@ -87,7 +87,7 @@ fastify.get('/fetch-candle-data', async (request, reply) => {
 
     try {
         const data = await fetchCandleData(instId, bar, afterDateTime, beforeDateTime, parseInt(waitTime) || 0);
-        console.log(data)
+        console.log(data.data.length)
         reply.send(data);
     } catch (error) {
         fastify.log.error('Error fetching candle data:', error);
