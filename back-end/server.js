@@ -16,7 +16,8 @@ function dateTimeToTimestamp(dateTimeStr) {
     const [day, month, year] = dateStr.split('-').map(Number);
     const [hours, minutes] = timeStr.split(':').map(Number);
     const date = new Date(year, month - 1, day, hours, minutes);
-    return date.getTime();
+    //return date.getTime();
+    return Date.UTC(year, month - 1, day, hours, minutes);
 }
 
 // Create a delay
@@ -41,7 +42,7 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
     while (nextBatchStart > after) {
         await wait(waitTime); // Wait for the specified time
 
-        const url = `https://www.okx.com/api/v5/market/history-mark-price-candles?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=300`;
+        const url = `https://www.okx.com/api/v5/market/history-mark-price-candles?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=60`;
         console.log(url);
         const response = await axios.get(url);
         const candles = response.data.data;

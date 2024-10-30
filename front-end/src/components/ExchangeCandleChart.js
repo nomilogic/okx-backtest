@@ -13,7 +13,17 @@ const ExchangeCandleChart = ({ data }) => {
             layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
             grid: { vertLines: { color: '#363c4e' }, horzLines: { color: '#363c4e' } },
             priceScale: { borderColor: '#485c7b' },
-            timeScale: { borderColor: '#485c7b' }, 
+            timeScale: {   
+                borderColor: '#f44336',  
+                timeVisible: true, // Show time on x-axis  
+                secondsVisible: false, // Hide seconds, show only hours and minutes  
+                tickMarkFormatter: (time) => {  
+                    const date = new Date(time * 1000); // Convert from seconds to milliseconds  
+                    const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+                    return date.toLocaleString('en-US', options); // Customize format as needed
+                },  
+                
+            },  
         });
 
         candleSeriesRef.current = chartRef.current.addCandlestickSeries({
@@ -26,18 +36,8 @@ const ExchangeCandleChart = ({ data }) => {
         });
 
         if (data) {
-            // Convert data properties to numbers and sort by time
-            const formattedData = data
-                .map(item => ({
-                    ...item,
-                    time: parseInt(item.time, 10),
-                    open: parseFloat(item.open),
-                    high: parseFloat(item.high),
-                    low: parseFloat(item.low),
-                    close: parseFloat(item.close),
-                }))
-                .sort((a, b) => a.time - b.time); // Sort in ascending order by time
-
+            
+            const formattedData = data  
             candleSeriesRef.current.setData(formattedData);
         }
 

@@ -20,12 +20,12 @@ const GridPage = () => {
             console.log(response.data.data, sortedData)
             
             const formattedData = sortedData.map(candle => ({
-                time: new Date(candle.timestamp).getTime() / 1000, // convert to seconds for chart compatibility
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close
-            }));
+                time:candle.timestamp/1000, // convert to seconds for chart compatibility
+                open: Number(candle.open),
+                high: Number(candle.high),
+                low: Number(candle.low),
+                close: Number(candle.close)
+            })).sort((a, b) => a.time - b.time);;
             //setChartData(formattedData);
              setHistoricalData(formattedData);
 

@@ -27,7 +27,7 @@ const BacktestGridBot = ({ config, priceData }) => {
         console.log(gridLevels);
     }, [gridLevels]); */
     const runBacktest = () => {
-        let virtualBalance = config.initialCapital;
+        let virtualBalance = Number(config.initialCapital);
         let currentPosition = 0;
         const newTransactions = [];
 
@@ -43,6 +43,7 @@ const BacktestGridBot = ({ config, priceData }) => {
                     virtualBalance += amount * level; // Add to balance for short
                 }
             });
+            console.log(newTransactions)
             // Update current position
             currentPosition = virtualBalance + currentPosition;
         }
@@ -59,8 +60,8 @@ const BacktestGridBot = ({ config, priceData }) => {
     return (
         <div>
             <h3>Backtest Results</h3>
-            <p>Open Position: {position.open.toFixed(2)}</p>
-            <p>Total P&L: {position.profit.toFixed(2)}</p>
+            <p>Open Position: {position.open.toFixed(10)}</p>
+            <p>Total P&L: {position.profit.toFixed(10)}</p>
             <ul>
                 {transactions.map((tx, idx) => (
                     <li key={idx}>{`${tx.type.charAt(0).toUpperCase() + tx.type.slice(1)} at ${tx.price.toFixed(2)}, Amount: ${tx.amount.toFixed(2)}`}</li>

@@ -8,6 +8,7 @@ const StrategyForm = ({ onChange }) => {
         neutral: false,
         priceRange: '',
         lowerLimit: '',
+        entryPrice:'',
     });
 
     const handleChange = (e) => {
@@ -38,6 +39,10 @@ const StrategyForm = ({ onChange }) => {
             <label>
                 Lower Limit
                 <input type="text" name="lowerLimit" value={strategyData.lowerLimit} onChange={handleChange} />
+            </label>
+            <label>
+                Entry Price
+                <input type="text" name="entryPrice" value={strategyData.entryPrice} onChange={handleChange} />
             </label>
         </form>
     );

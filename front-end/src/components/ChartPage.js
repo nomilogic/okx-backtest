@@ -9,16 +9,18 @@ const ChartPage = () => {
     const fetchData = async (params) => {
         try {
             const response = await axios.get('http://localhost:3000/fetch-candle-data', { params });
-            const sortedData = response.data.data.sort((a, b) => a.time - b.time);
-            console.log(response.data.data, sortedData)
+            const sortedData = response.data.data
+            console.log(sortedData)
+            //.sort((a, b) => a.timestamp - b.timestamp);
+           // console.log(response.data.data, sortedData)
             
             const formattedData = sortedData.map(candle => ({
-                time: new Date(candle.timestamp).getTime() / 1000, // convert to seconds for chart compatibility
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close
-            }));
+                time:candle.timestamp/1000, // convert to seconds for chart compatibility
+                open: Number(candle.open),
+                high: Number(candle.high),
+                low: Number(candle.low),
+                close: Number(candle.close)
+            })).sort((a, b) => a.time - b.time);;
             setChartData(formattedData);
         } catch (error) {
             console.error('Error fetching data:', error);
