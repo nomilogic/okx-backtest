@@ -1,7 +1,15 @@
 const fastify = require('fastify')({ logger: true });
 const fs = require('fs');
 const axios = require('axios');
+const cors = require('@fastify/cors');
 
+fastify.register(cors, {
+    // Define your CORS options here
+    origin: '*', // Allow all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
+    allowedHeaders: ['Content-Type', 'Authorization'] // Allowed headers
+});
+ 
 // Convert a datetime string (dd-mm-yyyy HH:mm) to a timestamp
 function dateTimeToTimestamp(dateTimeStr) {
     const [dateStr, timeStr] = dateTimeStr.split(' ');

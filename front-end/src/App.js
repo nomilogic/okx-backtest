@@ -1,36 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import CandleList from './components/CandleList';
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import NavigationBar from './components/NavigationBar';
+import Home from './components/Home';
+import ChartPage from './components/ChartPage';
+import GridPage from './components/GridPage';
 
 const App = () => {
-  const [candles, setCandles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchCandles = async () => {
-    try {
-      const response = await axios.get('https://api.example.com/candles'); // Replace with your API URL
-      setCandles(response.data);
-    } catch (err) {
-      setError('Failed to fetch candles.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCandles();
-  }, []);
-
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>{error}</p>;
-
-  return (
-    <div>
-      <h1>Candle Fetcher</h1>
-      <CandleList candles={candles} />
-    </div>
-  );
+    return (
+        <Router>
+            <NavigationBar />
+            <div style={{ padding: '1rem' }}>
+                <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/chart" element={<ChartPage />} />
+                    <Route path="/grid" element={<GridPage />} />
+                </Routes>
+            </div>
+        </Router>
+    );
 };
 
 export default App;
