@@ -71,7 +71,7 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
 
     // Save data to a file with a dynamic filename
     const filename = `candle_data_${instId}_${bar}_${Date.now()}.json`;
-    writeJsonToFile(filename, candleData);
+   // writeJsonToFile(filename, candleData);
 
     return candleData;
 }

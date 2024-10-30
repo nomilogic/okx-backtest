@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 const GridBotConfigForm = ({ onSubmit }) => {
     const [formData, setFormData] = useState({
         gridType: 'neutral',
-        gridCount: 5,
+        gridCount: 20,
         leverage: 1,
-        lowerLimit: '',
-        upperLimit: '',
+        lowerLimit: '14000',
+        upperLimit: '24000',
         initialCapital: 1000,
     });
 

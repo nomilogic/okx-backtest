@@ -34,7 +34,8 @@ const ExchangeCandleGridChart = ({ data, gridLevels, transactions }) => {
             candleSeriesRef.current.setData(formattedData);
         }
         // Draw grid levels
-        gridLevels.forEach((level) => {
+        if(null!=gridLevels && gridLevels.length>0)
+        {gridLevels.forEach((level) => {
             chartRef.current.addLineSeries({
                 priceLineVisible: true,
                 lineWidth: 1,
@@ -49,8 +50,9 @@ const ExchangeCandleGridChart = ({ data, gridLevels, transactions }) => {
             ]);
         });
        
-
+        }
         return () => chartRef.current.remove();
+        
     }, [data, gridLevels, transactions]);
 
     return <div ref={chartContainerRef} style={{ width: '100%', height: '400px' }} />;

@@ -49,7 +49,7 @@ const GridPage = () => {
             {config && historicalData.length > 0 && (
                 <>
                     <ExchangeCandleGridChart data={historicalData} gridLevels={config.gridLevels} />
-                    <BacktestGridBot config={config} historicalData={historicalData} />
+                    <BacktestGridBot config={config} priceData={historicalData} />
                 </>
             )}
         </div>

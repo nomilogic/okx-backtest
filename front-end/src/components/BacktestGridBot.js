@@ -2,21 +2,30 @@
 import React, { useState, useEffect } from 'react';
 
 const BacktestGridBot = ({ config, priceData }) => {
+    console.log(config, priceData)
     const [gridLevels, setGridLevels] = useState([]);
     const [position, setPosition] = useState({ open: 0, profit: 0 });
     const [transactions, setTransactions] = useState([]);
 
     useEffect(() => {
         if (config) setupGrids();
+
+        console.log(config)
     }, [config]);
 
     const setupGrids = () => {
         const { lowerLimit, upperLimit, gridCount } = config;
         const gridSize = (upperLimit - lowerLimit) / gridCount;
-        const levels = Array.from({ length: gridCount + 1 }, (_, i) => lowerLimit + i * gridSize);
-        setGridLevels(levels);
-    };
+        console.log(lowerLimit, upperLimit, gridCount, gridSize)
+        const levels = Array.from({ length: gridCount + 1 }, (_, i) => Number(lowerLimit) + Number(i) * gridSize);
 
+        setGridLevels(levels);
+        console.log(gridLevels)
+
+    };
+   /*  useEffect(() => {
+        console.log(gridLevels);
+    }, [gridLevels]); */
     const runBacktest = () => {
         let virtualBalance = config.initialCapital;
         let currentPosition = 0;
@@ -43,6 +52,7 @@ const BacktestGridBot = ({ config, priceData }) => {
     };
 
     useEffect(() => {
+        console.log(gridLevels)
         if (gridLevels.length > 0 && priceData.length > 0) runBacktest();
     }, [gridLevels, priceData]);
 
