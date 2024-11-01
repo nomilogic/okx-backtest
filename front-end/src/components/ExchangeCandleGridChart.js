@@ -30,7 +30,7 @@ const ExchangeCandleGridChart = ({ data, gridLevels, transactions }) => {
                 visible: true,  
                 borderColor: '#485c7b', 
                 textColor:'#f44336' ,
-                tickMarkFormatter: (price) => `$${price.toFixed(2)}`,  
+                tickMarkFormatter: (price) => `$${price.toFixed(8)}`,  
                 position: 'right', // 'left' to place it on the left  
             },  
             timeScale: {  

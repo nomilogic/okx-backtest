@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const DataForm = ({ onFetchData }) => {
     const [formData, setFormData] = useState({
-        instId: 'BTC-USDT-SWAP',
+        instId: 'TRX-USDT-SWAP',
         bar: '1m',
         afterDateTime: '01-01-2023 00:00',
         beforeDateTime: '01-01-2023 01:00',

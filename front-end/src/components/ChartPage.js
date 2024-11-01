@@ -15,7 +15,7 @@ const ChartPage = () => {
            // console.log(response.data.data, sortedData)
             
             const formattedData = sortedData.map(candle => ({
-                time:candle.timestamp/1000, // convert to seconds for chart compatibility
+                time:candle.time/1000, // convert to seconds for chart compatibility
                 open: Number(candle.open),
                 high: Number(candle.high),
                 low: Number(candle.low),

@@ -38,11 +38,23 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
 
     let allCandleData = [];
     let nextBatchStart = before;
+    let apiUrl='';
+    if(instId.search('SWAP')!=-1 )
+    {
+        apiUrl='https://www.okx.com/api/v5/market/history-candles'
+
+    }    
+    else
+    {
+        apiUrl="https://www.okx.com/api/v5/market/history-candles"
+
+    }
+    
 
     while (nextBatchStart > after) {
         await wait(waitTime); // Wait for the specified time
 
-        const url = `https://www.okx.com/api/v5/market/history-mark-price-candles?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=60`;
+        const url = `${apiUrl}?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=60`;
         console.log(url);
         const response = await axios.get(url);
         const candles = response.data.data;
@@ -52,12 +64,12 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
         }
 
         allCandleData = allCandleData.concat(candles.map(candle => ({
-            "timestamp": parseInt(candle[0]),
-            "open": candle[1],
-            "high": candle[2],
-            "low": candle[3],
-            "close": candle[4],
-            "volume": candle[5]
+            'time': parseInt(candle[0]),
+            'open': parseFloat(candle[1]),
+            'high': parseFloat(candle[2]),
+            'low': parseFloat(candle[3]),
+            'close': parseFloat(candle[4]),
+            'volume': candle[5]
         })));
         //break;
         nextBatchStart = parseInt(candles[candles.length - 1][0]);
@@ -65,9 +77,9 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
 
     // Format data for output
     const candleData = {
-        "instrument": instId,
-        "interval": bar,
-        "data": allCandleData
+        'instrument': instId,
+        'interval': bar,
+        'data': allCandleData
     };
 
     // Save data to a file with a dynamic filename
