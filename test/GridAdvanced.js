@@ -27,7 +27,7 @@ class CryptoOrder {
   fill() {
     this.filled = true;
     this.status = 'filled';
-    logger.log(`${this.type.charAt(0).toUpperCase() + this.type.slice(1)} order ${this.orderId} filled at price: ${this.price}`);
+    console.log(`${this.type.charAt(0).toUpperCase() + this.type.slice(1)} order ${this.orderId} filled at price: ${this.price}`);
   }
 }
 
@@ -50,13 +50,13 @@ class AdvancedOrder {
         quantity: this.buyOrder.quantity
       });
       this.orderManager.addOrder(this.sellOrder);
-      logger.log(`Sell order created at price: ${this.takeProfit} for quantity: ${this.buyOrder.quantity}`);
+      console.log(`Sell order created at price: ${this.takeProfit} for quantity: ${this.buyOrder.quantity}`);
     }
 
     if (this.sellOrder && currentPrice >= this.sellOrder.price) {
       this.sellOrder.fill();
       this.pnl = this.sellOrder.price - this.buyOrder.price;
-      logger.log(`Advanced order completed with PnL: ${this.pnl}`);
+      console.log(`Advanced order completed with PnL: ${this.pnl}`);
 
       if (this.auto) {
         this.resetOrder(currentPrice);
@@ -72,7 +72,7 @@ class AdvancedOrder {
     });
     this.orderManager.addOrder(this.buyOrder);
     this.sellOrder = null;
-    logger.log(`New buy order created at price: ${currentPrice}`);
+    console.log(`New buy order created at price: ${currentPrice}`);
   }
 }
 
@@ -83,7 +83,7 @@ class OrderManager {
 
   addOrder(order) {
     this.orders.push(order);
-    logger.log(`Order added: ${order.orderId} - ${order.type} at price: ${order.price}`);
+    console.log(`Order added: ${order.orderId} - ${order.type} at price: ${order.price}`);
   }
 
   getOrdersByStatus(status) {
@@ -145,7 +145,7 @@ class Grid {
   }
 
   updatePrice(currentPrice) {
-    logger.log(`Updating price to: ${currentPrice}`);
+    console.log(`Updating price to: ${currentPrice}`);
     
     // Check all buy orders and fill those that are at or below the current price
     this.activeOrders.forEach(order => {
@@ -184,4 +184,4 @@ const gridBot = new Grid({
 
 gridBot.updatePrice(0.0011); // Fills buy orders if price is at or below buy levels
 gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
-logger.log(gridBot.viewOrders());
+console.log(gridBot.viewOrders());
