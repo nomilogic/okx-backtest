@@ -118,6 +118,7 @@ class AdvancedOrder {
       this.orderManager.addOrderBnS({
         buyOrder: this.buyOrder,
         sellOrder: this.sellOrder,
+        pnl:this.pnl
       });
       if (this.auto) {
         this.resetOrder();
@@ -365,27 +366,38 @@ class Grid {
   }
 
   updatePnL(currentPrice) {
-    this.totalPnL = this.orderManager.orders.reduce((total, order) => {
-      if (order.filled) {
-        return total + (order.type === 'sell' ? order.filledAt - order.price : 0);
+    this.totalPnL = this.orderManager.ordersBnS.reduce((total, orderBnS) => {
+     /*  if (order.filled) {
+        return total + (order.type === 'sell' ? Number(order.filledAt) - Number(order.price) : 0);
+      } */
+      if (orderBnS.sellOrder.filled) {
+        return total + orderBnS.pnl
       }
       return total;
     }, 0);
 
-    this.unpairedPnL = this.orderManager.orders.reduce((total, order) => {
-      if (!order.filled && order.type === 'buy') {
-        return total + (currentPrice - order.price) * order.quantity;
+    this.unpairedPnL = this.activeOrders.reduce((total, order) => {
+      if (order.buyOrder.filled && !order.sellOrder.filled) {
+        return total + ((Number(currentPrice)) * Number(order.buyOrder.quantity))-( (Number(order.buyOrder.filledAt)) * Number(order.buyOrder.quantity));
       }
       return total;
     }, 0);
   }
-
+   usdtUsed(){
+    return this.activeOrders.reduce((total, order) => {
+    if (order.buyOrder.filled && !order.sellOrder.filled) {
+      return total + (Number(order.buyOrder.filledAt)) * Number(order.buyOrder.quantity);
+    }
+    return total;
+  }, 0)}
   getGridSummary(currentPrice) {
     this.updatePnL(currentPrice); // Update PnL based on the current price
 
     const currentHoldings = {
-      crypto: this.activeOrders.reduce((total, order) => total + order.quantity, 0),
-      usdt: this.orderManager.orders.reduce((total, order) => total + (order.filled ? order.filledAt * order.quantity : 0), 0),
+      crypto: this.activeOrders.reduce((total, order) => total + (order.buyOrder.filled ? order.quantity:0), 0),
+      usdtFree: this.totalAmountUSDT - this.usdtUsed(),
+      usdtUsed:this.usdtUsed(),
+     
     };
 
     const priceRange = {
@@ -419,7 +431,7 @@ class Grid {
         created: new Date(this.startTime).toLocaleString(),
       },
       totalPnL: {
-        total: `${this.totalPnL.toFixed(4)} USDT`,
+        total: `${this.totalPnL.toFixed(8)} USDT`,
         percentage: `${((this.totalPnL / this.investmentAmount) * 100).toFixed(2)}%`,
         gridProfit: `${this.totalPnL.toFixed(4)} USDT`,
         unpairedPnL: `${this.unpairedPnL.toFixed(4)} USDT`,
@@ -428,10 +440,10 @@ class Grid {
           crypto: "0.00 " + this.cryptoName,
           usdt: "0.00 USDT",
         },
-      },
+      },  
       currentHoldings: {
         crypto: currentHoldings.crypto.toFixed(4),
-        valueInUSDT: `${(currentHoldings.usdt + currentHoldings.crypto * currentPrice).toFixed(4)} USDT`,
+        valueInUSDT:this.usdtUsed().toFixed(4) + ` USDT`,
         initial: {
           crypto: "0 " + this.cryptoName,
           usdt: `${this.investmentAmount.toFixed(4)} USDT`,
@@ -483,28 +495,28 @@ class PriceManager extends EventDispatcher {
   
    static #currentPrice = 0;
    static #time = 0;
-
   // Static getter for the currentPrice
   static get currentPrice() {
-    return this.#currentPrice;
+    return PriceManager.#currentPrice;
   }
   static get time() {
-    return this.#time;
+    return PriceManager.#time;
   }
   
   constructor(initialPrice) {
     
     super(); // Call the parent constructor
-    this.currentPrice = this.price = initialPrice;
-    this.minPercentChange = -0.010014; // Minimum fluctuation percentage (-0.5%)
-    this.maxPercentChange = 0.010014; // Maximum fluctuation percentage (+0.5%)
+    this.price = initialPrice;
+    this.minPercentChange = -0.02; // Minimum fluctuation percentage (-0.5%)
+    this.maxPercentChange = 0.02; // Maximum fluctuation percentage (+0.5%)
     this.priceLoop = null;
     this.startTime = null;
     this.elapsedMs = 0; // Track elapsed milliseconds
     this._time=Date.now();
-    console.log(this, PriceManager.currentPrice, this.time);
-      
+    this.updatePrice() 
 
+    console.log(this, PriceManager.currentPrice, PriceManager.time);
+      
   }
 
   // Method to update the price with a random fluctuation
@@ -521,11 +533,11 @@ class PriceManager extends EventDispatcher {
     // Get current time
     //const currentTime = new Date().toISOString(); // Use ISO format for the timestamp
     PriceManager.#currentPrice=this.price;
-    PriceManager.#time=this.time;
+    PriceManager.#time=this._time;
     // Dispatch the priceChanged event with the current price and timestamp
     this.dispatchEvent(PriceManager.Events.PRICE_CHANGED, {
       price: this.price,
-      time: this.time,
+      time: this._time,
     }); // Notify the 'priceChanged' event
    // this.time=currentTime;
   }
@@ -575,14 +587,14 @@ class PriceManager extends EventDispatcher {
 
     // Calculate adjusted target duration based on speed multiplier
     const targetDuration = this.parseTimeInterval(targetTime);
-    this.startTime = PriceManager.time;
-    this.time=this.startTime;
+    this.startTime =this._time;
+   // this._time=this.startTime;
     this.elapsedMs = 0; // Reset elapsed milliseconds
 
     // Begin loop
     this.priceLoop = setInterval(() => {
       this.elapsedMs += interval * speedMultiplier; // Increment elapsed time by interval multiplied by speed
-      this.time=this.startTime+this.elapsedMs;
+      this._time=this.startTime+this.elapsedMs;
       if (this.elapsedMs >= targetDuration) {
         this.stop(); // Stop the loop when adjusted target time is reached
         this.dispatchEvent(
@@ -610,7 +622,7 @@ class PriceManager extends EventDispatcher {
     const breakDuration = this.parseTimeInterval(breakTime);
 
     this.startTime = Date.now();
-    this.time=this.startTime;
+    this._time=this.startTime;
     this.elapsedMs = 0; // Reset elapsed time
     let batchs = 0;
 
@@ -623,7 +635,7 @@ class PriceManager extends EventDispatcher {
       while (iterations < maxIterations) {
         this.updatePrice(); // Update price per iteration
         this.elapsedMs += interval;
-        this.time=this.startTime+this.elapsedMs;
+        this._time=this.startTime+this.elapsedMs;
         iterations++;
 
         // Check if we've reached the target duration during this batch
@@ -637,7 +649,7 @@ class PriceManager extends EventDispatcher {
           return; // Exit if target duration is reached
         }
       }
-      console.log(`Batch complete ${batchs}, ${this.price} ,${new Date(PriceManager.time).toDateString()}${PriceManager.time}`);
+      console.log(`Batch complete ${batchs}, ${this.price} ,${new Date(PriceManager.time).toDateString()}`);
 
       // Schedule the next batch with a break time
       setTimeout(processBatch, breakDuration);
@@ -702,7 +714,7 @@ priceManager.addEventListener(PriceManager.Events.COMPLETED, (dummy) => {
     `Price fluctuation completed. Final price: $${dummy.finalPrice.toFixed(8)}. Elapsed time: ${dummy.elapsedTime}. Message: ${dummy.message}`
   );
   console.log(gridBot.viewOrders());
-  console.log(gridBot.getGridSummary());
+  console.log(gridBot.getGridSummary(PriceManager.currentPrice));
 });
 
 // Add event listener for forced stop
@@ -714,7 +726,7 @@ priceManager.addEventListener(PriceManager.Events.STOPPED, (data) => {
 
 // Start the price fluctuation loop
 //priceManagerpriceManager.start(1, '30d', 1000);
-priceManager.startFast("5d", "1s", 10000, "1ms");
+priceManager.startFast("15d", "1s", 10000, "1ms");
 
 // To stop the price updates manually, call:
 // priceManager.stop();

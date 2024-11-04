@@ -1,0 +1,5 @@
+{  
+  "rules": {  
+    "no-private-in": "off" // Disable this rule  
+  }  
+}

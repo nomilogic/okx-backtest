@@ -439,7 +439,7 @@ class PriceManager extends EventDispatcher {
   
 
   // Start the price fluctuation loop with flexible intervals and a target time
-  start(interval = 1000, targetTime = "1m", speedMultiplier = 1) {
+  startWithTimer(interval = 1000, targetTime = "1m", speedMultiplier = 1) {
     this.stop(); // Ensure no duplicate intervals
 
     // Calculate adjusted target duration based on speed multiplier
