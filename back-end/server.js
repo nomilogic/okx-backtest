@@ -54,7 +54,7 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
     while (nextBatchStart > after) {
         await wait(waitTime); // Wait for the specified time
 
-        const url = `${apiUrl}?instId=${instId}&bar=${bar}&before=${after}&after=${nextBatchStart}&limit=60`;
+        const url = `${apiUrl}?instId=${instId}${bar!=0 ? '&bar='+bar:'' }&before=${after}&after=${nextBatchStart}&limit=300`;
         console.log(url);
         const response = await axios.get(url);
         const candles = response.data.data;
@@ -84,7 +84,7 @@ async function fetchCandleData(instId, bar, afterDateTimeStr, beforeDateTimeStr,
 
     // Save data to a file with a dynamic filename
     const filename = `candle_data_${instId}_${bar}_${Date.now()}.json`;
-   // writeJsonToFile(filename, candleData);
+   writeJsonToFile(filename, candleData);
 
     return candleData;
 }

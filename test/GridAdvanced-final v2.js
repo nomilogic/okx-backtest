@@ -1,3 +1,38 @@
+
+class EventDispatcher {
+    constructor() {
+      this._listeners = {};
+    }
+  
+    static Events = {
+      PRICE_UPDATED: "priceUpdated",
+    };
+  
+    addEventListener(event, callback) {
+      if (!this._listeners[event]) {
+        this._listeners[event] = [];
+      }
+      this._listeners[event].push(callback);
+    }
+  
+    removeEventListener(event, callback) {
+      if (!this._listeners[event]) return;
+  
+      const index = this._listeners[event].indexOf(callback);
+      if (index > -1) {
+        this._listeners[event].splice(index, 1);
+      }
+    }
+  
+    dispatchEvent(event, data) {
+      if (!this._listeners[event]) return;
+  
+      this._listeners[event].forEach((callback) => {
+        callback(data);
+      });
+    }
+  }
+  
 class CryptoOrder {
   constructor({
     type,
@@ -8,7 +43,7 @@ class CryptoOrder {
     timestamp = Date.now(),
     stopLoss = null,
     takeProfit = null,
-    filledAt=null,
+    filledAt = null,
   }) {
     this.type = type;
     this.price = price;
@@ -25,81 +60,128 @@ class CryptoOrder {
     return "order-" + Math.random().toString(36).substr(2, 9);
   }
 
-  fill(currentPrice=this.price) {
+  fill(currentPrice = this.price) {
     this.filled = true;
     this.status = "filled";
     console.log(
       `${this.type.charAt(0).toUpperCase() + this.type.slice(1)} order ${
         this.orderId
-      } filled at price: ${currentPrice} of fill Price ${this.price}`
+      } filled at price: ${PriceManager.currentPrice} of fill Price ${this.price}`
     );
-    this.filledAt=currentPrice
-    console.log(this)
-
+    this.filledAt = PriceManager.currentPrice;
   }
 }
 
 class AdvancedOrder {
-  constructor({ buyOrder, sellPrice, buyPrice, auto = false, orderManager }) {
-    this.buyOrder = buyOrder;
+  constructor({ quantity, sellPrice, buyPrice, auto = false, orderManager }) {
     this.sellOrder = null;
-    this.sellPrice = sellPrice;
-    this.buyPrice = buyPrice;
+    this.sellPrice = Number(sellPrice.toFixed(8));
+    this.buyPrice = Number(buyPrice.toFixed(8));
+    this.quantity = Number(quantity.toFixed(2));
 
     this.pnl = 0;
     this.auto = auto;
     this.orderManager = orderManager;
-    this.orderManager.addOrder(this.buyOrder);
+    this.createNewTpLimitOrder();
+   // this.buyOrder = orderManager.CreateNewOrder();
+
     //this.orderManager.addAdvancedOrder(this.buyOrder);
   }
 
   checkAndCreateSell(currentPrice) {
+    const checkbuy=this.buyOrder!==null ? this.checkAndPerfomOrderBuyOrSell(this.buyOrder):"";
+    const checkSell=null !== this.sellOrder ? this.checkAndPerfomOrderBuyOrSell(this.sellOrder):"";
+    //this.checkAndPerfomOrderBuyOrSell(this.buyOrder);
+
     if (this.buyOrder.filled && !this.sellOrder) {
-      this.sellOrder = new CryptoOrder({
+      let orderInfo = {
         type: "sell",
         price: this.sellPrice,
         quantity: this.buyOrder.quantity,
-      });
-      this.orderManager.addOrder(this.sellOrder);
+      };
+      this.sellOrder = this.orderManager.CreateNewOrder(
+        orderInfo.type,
+        orderInfo.price,
+        orderInfo.quantity
+      );
+      
       console.log(
         `Sell order created at price: ${this.sellPrice} for quantity: ${this.buyOrder.quantity}`
       );
     }
 
-    if (this.sellOrder && currentPrice >= this.sellOrder.price) {
-      this.sellOrder.fill(currentPrice);
-      this.pnl = this.sellOrder.filledAt - this.buyOrder.filledAt;
-      
+    if (this.sellOrder && this.sellOrder.filled) {
+     // this.sellOrder.fill(currentPrice);
+      this.pnl = Number((this.sellOrder.filledAt - this.buyOrder.filledAt).toFixed(8));
+
       console.log(`Advanced order completed with PnL: ${this.pnl}`);
       this.orderManager.addOrderBnS({
         buyOrder: this.buyOrder,
         sellOrder: this.sellOrder,
       });
       if (this.auto) {
-        this.resetOrder(currentPrice);
+        this.resetOrder();
       }
     }
   }
+  checkAndPerfomOrderBuyOrSell(order) {
+    if (
+      order.type === "buy" &&
+      !order.filled &&
+      PriceManager.currentPrice <= order.price
+    ) {
+      order.fill(PriceManager.currentPrice);
+      console.log(order,"orderFilled -- ")
 
-  resetOrder(currentPrice) {
-    this.buyOrder = new CryptoOrder({
+    } else if (
+      order.type === "sell" &&
+      !order.filled &&
+      PriceManager.currentPrice >= order.price
+    ) {
+      order.fill(PriceManager.currentPrice);
+      console.log(order,PriceManager.currentPrice)
+    }
+
+    // If the buy order is filled, check if sell conditions are met
+    // order.checkAndCreateSell(currentPrice);
+  }
+
+  createNewTpLimitOrder() {
+    let orderInfo = {
       type: "buy",
       price: this.buyPrice,
-      quantity: this.sellOrder.quantity,
-    });
-    this.orderManager.addOrder(this.buyOrder);
+      quantity: this.quantity,
+    };
+    this.buyOrder = this.orderManager.CreateNewOrder(orderInfo.type, orderInfo.price, orderInfo.quantity);
     this.sellOrder = null;
-    console.log(`New buy order created at price: ${currentPrice} to buy at ${this.buyPrice}`);
-    console.log(this.buyOrder)
+    console.log(
+      `New buy order created at price: ${PriceManager.currentPrice} to buy at ${this.buyPrice}`
+    );
+    console.log(this.buyOrder);
+  }
+
+  resetOrder() {
+    this.createNewTpLimitOrder(PriceManager.currentPrice);
   }
 }
 
-class OrderManager {
+class OrderManager extends EventDispatcher {
+  static Events = {
+    ...EventDispatcher.Events, // Include base events
+    PRICE_CHANGED: "priceChanged", // Event for price changes
+    COMPLETED: "completed", // Event for normal completion
+    STOPPED: "stopped", // Event for forced stop
+  };
+
   constructor() {
+    super(); // Call the parent constructor
     this.orders = [];
     this.ordersBnS = [];
   }
 
+  generateOrderId() {
+    return "order-" + Math.random().toString(36).substr(2, 9);
+  }
   addOrder(order) {
     this.orders.push(order);
     console.log(
@@ -162,6 +244,42 @@ class OrderManager {
   viewOrderBnSHistory() {
     return this.ordersBnS;
   }
+
+  CreateNewOrder(type = "buy", price = 0, quantity = 0) {
+    const order = new CryptoOrder({
+      type: type,
+      price: price,
+      quantity: quantity,
+    });
+    this.addOrder(order);
+
+    return order;
+  }
+
+  onPriceChange(currentPrice) {
+   // console.log(currentPrice," price change ")
+    this.orders.forEach((order) => {
+      if (
+        order.type === "buy" &&
+        !order.filled &&
+        currentPrice >= order.price
+      ) {
+        order.fill(currentPrice);
+        console.log(order,"orderFilled -- ")
+
+      } else if (
+        order.type === "sell" &&
+        !order.filled &&
+        currentPrice >= order.price
+      ) {
+        order.fill(currentPrice);
+        console.log(order,"orderFilled")
+      }
+
+      // If the buy order is filled, check if sell conditions are met
+      // order.checkAndCreateSell(currentPrice);
+    });
+  }
 }
 
 class Grid {
@@ -189,13 +307,9 @@ class Grid {
     this.activeOrders = this.gridLevels.map(
       (level) =>
         new AdvancedOrder({
-          buyOrder: new CryptoOrder({
-            type: "buy",
-            price: level,
-            quantity: this.amountPerGrid,
-          }),
+          quantity: this.amountPerGrid,
           sellPrice: level + this.averagePrice,
-          buyPrice:level,
+          buyPrice: level,
           auto: true,
           orderManager: this.orderManager,
         })
@@ -216,11 +330,8 @@ class Grid {
 
     // Check all buy orders and fill those that are at or below the current price
     this.activeOrders.forEach((order) => {
-      if (!order.buyOrder.filled && currentPrice <= order.buyOrder.price) {
-        order.buyOrder.fill(currentPrice);
-      }
-
-      // If the buy order is filled, check if sell conditions are met
+     
+     // If the buy order is filled, check if sell conditions are met
       order.checkAndCreateSell(currentPrice);
     });
 
@@ -237,68 +348,29 @@ class Grid {
   }
 }
 
-// Instantiate the OrderManager
-const orderManager = new OrderManager();
-
-// Example usage
-const gridBot = new Grid({
-  lowerPrice: 0.002,
-  upperPrice: 0.0044,
-  gridQuantity: 25,
-  totalAmountUSDT: 100,
-  creationPrice: 0.0025,
-  lastPrice: 0.0025,
-  orderManager: orderManager,
-});
-
-class EventDispatcher{
-  constructor() {
-    this._listeners = {};
-  }
-
-  static Events = {
-    PRICE_UPDATED: "priceUpdated",
-  };
-
-  addEventListener(event, callback) {
-    if (!this._listeners[event]) {
-      this._listeners[event] = []
-    }
-    this._listeners[event].push(callback);
-  }
-
-  removeEventListener(event, callback) {
-    if (!this._listeners[event]) return;
-
-    const index = this._listeners[event].indexOf(callback);
-    if (index > -1) {
-      this._listeners[event].splice(index, 1);
-    }
-  }
-
-  dispatchEvent(event, data) {
-    if (!this._listeners[event]) return;
-
-    this._listeners[event].forEach((callback) => {
-      callback(data);
-    });
-  }
-}
-
 ``;
-class PriceManager extends EventDispatcher{
+class PriceManager extends EventDispatcher {
   static Events = {
     ...EventDispatcher.Events, // Include base events
     PRICE_CHANGED: "priceChanged", // Event for price changes
     COMPLETED: "completed", // Event for normal completion
     STOPPED: "stopped", // Event for forced stop
   };
+  static #currentPrice = 0;
+  static #time = 0;
 
+  // Static getter for the currentPrice
+  static get currentPrice() {
+    return PriceManager.#currentPrice;
+  }
+  static get time() {
+    return PriceManager.#time;
+  }
   constructor(initialPrice) {
     super(); // Call the parent constructor
-    this.price = initialPrice;
-    this.minPercentChange = -2; // Minimum fluctuation percentage (-0.5%)
-    this.maxPercentChange = 2; // Maximum fluctuation percentage (+0.5%)
+    PriceManager.#currentPrice = this.price = initialPrice;
+    this.minPercentChange = -0.010014; // Minimum fluctuation percentage (-0.5%)
+    this.maxPercentChange = 0.010014; // Maximum fluctuation percentage (+0.5%)
     this.priceLoop = null;
     this.startTime = null;
     this.elapsedMs = 0; // Track elapsed milliseconds
@@ -310,8 +382,11 @@ class PriceManager extends EventDispatcher{
       (Math.random() * (this.maxPercentChange - this.minPercentChange) +
         this.minPercentChange) /
       100;
-    this.price = parseFloat(this.price * (1 + percentChange)); // Keep two decimal points
+    this.currentPrice = this.price = parseFloat(
+      (this.price * (1 + percentChange)).toFixed(8)
+    ); // Keep two decimal points
 
+    this.price=Number(this.price.toFixed(8))
     // Get current time
     const currentTime = new Date().toISOString(); // Use ISO format for the timestamp
 
@@ -320,6 +395,8 @@ class PriceManager extends EventDispatcher{
       price: this.price,
       time: currentTime,
     }); // Notify the 'priceChanged' event
+    PriceManager.#currentPrice=this.price;
+    PriceManager.#time=this.time;
   }
 
   // Helper to convert time format to milliseconds
@@ -360,6 +437,7 @@ class PriceManager extends EventDispatcher{
     }
   }
   
+
   // Start the price fluctuation loop with flexible intervals and a target time
   start(interval = 1000, targetTime = "1m", speedMultiplier = 1) {
     this.stop(); // Ensure no duplicate intervals
@@ -425,7 +503,7 @@ class PriceManager extends EventDispatcher{
           return; // Exit if target duration is reached
         }
       }
-      console.log(`Batch complete ${batchs}`);
+      console.log(`Batch complete ${batchs}, ${this.currentPrice}`);
 
       // Schedule the next batch with a break time
       setTimeout(processBatch, breakDuration);
@@ -456,21 +534,38 @@ class PriceManager extends EventDispatcher{
 }
 
 // Example usage:
-const priceManager = new PriceManager(0.0025); // Initial price of $100
+const priceManager = new PriceManager(0.0015); // Initial price of $100
+
+// Instantiate the OrderManager
+const orderManager = new OrderManager();
+
+// Example usage
+const gridBot = new Grid({
+  lowerPrice: 0.001,
+  upperPrice: 0.002,
+  gridQuantity: 5,
+  totalAmountUSDT: 10,
+  creationPrice: 0.0015,
+  lastPrice: 0.0015,
+  orderManager: orderManager,
+});
+
 
 // Add an event listener for price changes
 priceManager.addEventListener(
   PriceManager.Events.PRICE_CHANGED,
   ({ price, time }) => {
     // console.log(`Price updated: $${price} at ${time}`);
+    //orderManager.onPriceChange(price);
     gridBot.updatePrice(price); // Fills buy orders if price is at or below buy levels
+
   }
 );
 
 // Add event listener for completion
 priceManager.addEventListener(PriceManager.Events.COMPLETED, (dummy) => {
   console.log(
-    `Price fluctuation completed. Final price: $${dummy.finalPrice}. Elapsed time: ${dummy.elapsedTime}. Message: ${dummy.message}`
+    `Price fluctuation completed. Final price: $${dummy.finalPrice.toFixed(8)}. Elapsed time: ${dummy.elapsedTime}. Message: ${dummy.message}`
   );
   console.log(gridBot.viewOrders());
 });
@@ -484,7 +579,7 @@ priceManager.addEventListener(PriceManager.Events.STOPPED, (data) => {
 
 // Start the price fluctuation loop
 //priceManagerpriceManager.start(1, '30d', 1000);
-priceManager.startFast("3d", "1s", 10000, "1ms");
+priceManager.startFast("365d", "1s", 10000, "1ms");
 
 // To stop the price updates manually, call:
 // priceManager.stop();
