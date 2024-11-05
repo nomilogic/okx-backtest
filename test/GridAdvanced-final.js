@@ -1,3 +1,21 @@
+class Utils
+{
+  static getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min;
+  }
+  static toFixedNoRound(num, decimalPlaces) {
+    return (
+      Math.floor(Number(num) * Math.pow(10, decimalPlaces)) /
+      Math.pow(10, decimalPlaces)
+    );
+  }
+}
+
+
+
+
 class EventDispatcher {
   constructor() {
     this._listeners = {};
@@ -57,11 +75,13 @@ class CryptoOrder {
     this.feeRate = feeRate;
     this.totalCost = Number(this.quantity * this.price).toFixed(8);
 
-    this.fee = Number(
+    this.fee = Utils.toFixedNoRound(Number(
       this.type !== "buy"
         ? this.quantity * this.price * feeRate
         : this.quantity * feeRate
-    ).toFixed(8);
+    ), 8);
+
+
   }
 
   generateOrderId() {
@@ -97,7 +117,7 @@ class AdvancedOrder {
     this.sellOrder = null;
     this.sellPrice = Number(sellPrice.toFixed(8));
     this.buyPrice = Number(buyPrice.toFixed(8));
-    this.quantity = Number(this.toFixedNoRound(quantity, 2));
+    this.quantity = Number(Utils.toFixedNoRound(quantity, 2));
     this.sellerFeeRate = 0.08 / 100;
     this.buyerFeeRate = 0.08 / 100;
     this.currentPrice = currentPrice;
@@ -105,18 +125,13 @@ class AdvancedOrder {
     this.pnl = 0;
     this.auto = auto;
     this.#orderManager = orderManager;
-    this.createNewTpLimitOrder();
+    this.createNewTpLimitOrder(currentPrice);
     // this.buyOrder = orderManager.CreateNewOrder();
 
     //this.orderManager.addAdvancedOrder(this.buyOrder);
   }
 
-  toFixedNoRound(num, decimalPlaces) {
-    return (
-      Math.floor(Number(num) * Math.pow(10, decimalPlaces)) /
-      Math.pow(10, decimalPlaces)
-    );
-  }
+  
   checkAndCreateSell(currentPrice) {
     const checkbuy =
       this.buyOrder !== null
@@ -129,14 +144,11 @@ class AdvancedOrder {
     //this.checkAndPerfomOrderBuyOrSell(this.buyOrder);
 
     if (this.buyOrder.filled && !this.sellOrder) {
-      this.quantity = this.toFixedNoRound(
-        this.buyOrder.quantity - this.buyOrder.fee,
-        2
-      );
+     
       let orderInfo = {
         type: "sell",
         price: this.sellPrice,
-        quantity: this.quantity,
+        quantity: this.sellQuantity,
         feeRate: this.sellerFeeRate,
       };
       this.sellOrder = this.orderManager.CreateNewOrder(
@@ -204,6 +216,8 @@ class AdvancedOrder {
       orderInfo.quantity
     );
     this.sellOrder = null;
+    this.sellQuantity= Utils.toFixedNoRound(this.quantity-this.buyOrder.fee, 2)
+
     console.log(
       `New buy order created at price: ${currentPrice} to buy at ${this.buyPrice}`
     );
@@ -211,6 +225,7 @@ class AdvancedOrder {
   }
 
   resetOrder(currentPrice) {
+    this.quantity=this.quantity
     this.createNewTpLimitOrder(currentPrice);
   }
 }
