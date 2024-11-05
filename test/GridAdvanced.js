@@ -181,8 +181,9 @@ class Grid {
     this.creationPrice = creationPrice;
     this.lastPrice = lastPrice;
     this.averagePrice = (upperPrice - lowerPrice) / gridQuantity;
-    this.amountPerGrid =
-      totalAmountUSDT / gridQuantity / ((upperPrice + lowerPrice) / 2);
+    //this.amountPerGrid =totalAmountUSDT / gridQuantity / ((upperPrice + lowerPrice) / 2);
+      this.amountPerGrid = (totalAmountUSDT/( (lowerPrice + (upperPrice - ( (upperPrice-lowerPrice) / gridQuantity ) ) )/2))/gridQuantity
+
     this.orderManager = orderManager;
 
     this.gridLevels = this.calculateGridLevels();
@@ -242,12 +243,12 @@ const orderManager = new OrderManager();
 
 // Example usage
 const gridBot = new Grid({
-  lowerPrice: 0.002,
-  upperPrice: 0.0044,
-  gridQuantity: 25,
-  totalAmountUSDT: 100,
-  creationPrice: 0.0025,
-  lastPrice: 0.0025,
+  lowerPrice: 0.001,
+  upperPrice: 0.002,
+  gridQuantity: 10,
+  totalAmountUSDT: 10,
+  creationPrice: 0.0015,
+  lastPrice: 0.0015,
   orderManager: orderManager,
 });
 
@@ -297,8 +298,8 @@ class PriceManager extends EventDispatcher{
   constructor(initialPrice) {
     super(); // Call the parent constructor
     this.price = initialPrice;
-    this.minPercentChange = -2; // Minimum fluctuation percentage (-0.5%)
-    this.maxPercentChange = 2; // Maximum fluctuation percentage (+0.5%)
+    this.minPercentChange = -0.02; // Minimum fluctuation percentage (-0.5%)
+    this.maxPercentChange =   0.02; // Maximum fluctuation percentage (+0.5%)
     this.priceLoop = null;
     this.startTime = null;
     this.elapsedMs = 0; // Track elapsed milliseconds
@@ -484,7 +485,7 @@ priceManager.addEventListener(PriceManager.Events.STOPPED, (data) => {
 
 // Start the price fluctuation loop
 //priceManagerpriceManager.start(1, '30d', 1000);
-priceManager.startFast("3d", "1s", 10000, "1ms");
+priceManager.startFast("1m", "1s", 10000, "1ms");
 
 // To stop the price updates manually, call:
 // priceManager.stop();

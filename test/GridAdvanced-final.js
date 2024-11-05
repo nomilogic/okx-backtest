@@ -1,38 +1,37 @@
-
 class EventDispatcher {
-    constructor() {
-      this._listeners = {};
+  constructor() {
+    this._listeners = {};
+  }
+
+  static Events = {
+    PRICE_UPDATED: "priceUpdated",
+  };
+
+  addEventListener(event, callback) {
+    if (!this._listeners[event]) {
+      this._listeners[event] = [];
     }
-  
-    static Events = {
-      PRICE_UPDATED: "priceUpdated",
-    };
-  
-    addEventListener(event, callback) {
-      if (!this._listeners[event]) {
-        this._listeners[event] = [];
-      }
-      this._listeners[event].push(callback);
-    }
-  
-    removeEventListener(event, callback) {
-      if (!this._listeners[event]) return;
-  
-      const index = this._listeners[event].indexOf(callback);
-      if (index > -1) {
-        this._listeners[event].splice(index, 1);
-      }
-    }
-  
-    dispatchEvent(event, data) {
-      if (!this._listeners[event]) return;
-  
-      this._listeners[event].forEach((callback) => {
-        callback(data);
-      });
+    this._listeners[event].push(callback);
+  }
+
+  removeEventListener(event, callback) {
+    if (!this._listeners[event]) return;
+
+    const index = this._listeners[event].indexOf(callback);
+    if (index > -1) {
+      this._listeners[event].splice(index, 1);
     }
   }
-  
+
+  dispatchEvent(event, data) {
+    if (!this._listeners[event]) return;
+
+    this._listeners[event].forEach((callback) => {
+      callback(data);
+    });
+  }
+}
+
 class CryptoOrder {
   constructor({
     type,
@@ -44,6 +43,7 @@ class CryptoOrder {
     stopLoss = null,
     takeProfit = null,
     filledAt = null,
+    feeRate = 0.08 / 100,
   }) {
     this.type = type;
     this.price = price;
@@ -54,6 +54,13 @@ class CryptoOrder {
     this.stopLoss = stopLoss;
     this.takeProfit = takeProfit;
     this.filled = false;
+    this.feeRate = feeRate;
+
+    this.fee = Number(
+      this.type !== "buy"
+        ? this.quantity * this.price * feeRate
+        : this.quantity * feeRate
+    ).toFixed(8);
   }
 
   generateOrderId() {
@@ -66,103 +73,143 @@ class CryptoOrder {
     console.log(
       `${this.type.charAt(0).toUpperCase() + this.type.slice(1)} order ${
         this.orderId
-      } filled at price: ${PriceManager.currentPrice} of fill Price ${this.price}`
+      } filled at price: ${currentPrice} of fill Price ${this.price}`
     );
-    this.filledAt = PriceManager.currentPrice;
+    this.filledAt = currentPrice;
   }
 }
 
 class AdvancedOrder {
-  constructor({ quantity, sellPrice, buyPrice, auto = false, orderManager }) {
+  #orderManager;
+  get orderManager() {
+    return this.#orderManager;
+  }
+  constructor({
+    quantity,
+    sellPrice,
+    buyPrice,
+    auto = false,
+    orderManager,
+    currentPrice,
+  }) {
     this.sellOrder = null;
     this.sellPrice = Number(sellPrice.toFixed(8));
     this.buyPrice = Number(buyPrice.toFixed(8));
-    this.quantity = Number(quantity.toFixed(2));
+    this.quantity = Number(this.toFixedNoRound(quantity, 2));
+    this.sellerFeeRate = 0.08 / 100;
+    this.buyerFeeRate = 0.08 / 100;
+    this.currentPrice = currentPrice;
 
     this.pnl = 0;
     this.auto = auto;
-    this.orderManager = orderManager;
+    this.#orderManager = orderManager;
     this.createNewTpLimitOrder();
-   // this.buyOrder = orderManager.CreateNewOrder();
+    // this.buyOrder = orderManager.CreateNewOrder();
 
     //this.orderManager.addAdvancedOrder(this.buyOrder);
   }
 
+  toFixedNoRound(num, decimalPlaces) {
+    return (
+      Math.floor(Number(num) * Math.pow(10, decimalPlaces)) /
+      Math.pow(10, decimalPlaces)
+    );
+  }
   checkAndCreateSell(currentPrice) {
-    const checkbuy=this.buyOrder!==null ? this.checkAndPerfomOrderBuyOrSell(this.buyOrder):"";
-    const checkSell=null !== this.sellOrder ? this.checkAndPerfomOrderBuyOrSell(this.sellOrder):"";
+    const checkbuy =
+      this.buyOrder !== null
+        ? this.checkAndPerfomOrderBuyOrSell(this.buyOrder, currentPrice)
+        : "";
+    const checkSell =
+      null !== this.sellOrder
+        ? this.checkAndPerfomOrderBuyOrSell(this.sellOrder, currentPrice)
+        : "";
     //this.checkAndPerfomOrderBuyOrSell(this.buyOrder);
 
     if (this.buyOrder.filled && !this.sellOrder) {
+      this.quantity = this.toFixedNoRound(
+        this.buyOrder.quantity - this.buyOrder.fee,
+        2
+      );
       let orderInfo = {
         type: "sell",
         price: this.sellPrice,
-        quantity: this.buyOrder.quantity,
+        quantity: this.quantity,
+        feeRate: this.sellerFeeRate,
       };
       this.sellOrder = this.orderManager.CreateNewOrder(
         orderInfo.type,
         orderInfo.price,
         orderInfo.quantity
       );
-      
+
       console.log(
         `Sell order created at price: ${this.sellPrice} for quantity: ${this.buyOrder.quantity}`
       );
     }
 
     if (this.sellOrder && this.sellOrder.filled) {
-     // this.sellOrder.fill(currentPrice);
-      this.pnl = Number((this.sellOrder.filledAt - this.buyOrder.filledAt).toFixed(8));
+      // this.sellOrder.fill(currentPrice);
+      this.pnl = Number(
+        (
+          this.sellOrder.filledAt * this.sellOrder.quantity -
+          this.sellOrder.fee -
+          this.buyOrder.filledAt * this.buyOrder.quantity
+        ).toFixed(8)
+      );
 
       console.log(`Advanced order completed with PnL: ${this.pnl}`);
       this.orderManager.addOrderBnS({
         buyOrder: this.buyOrder,
         sellOrder: this.sellOrder,
-        pnl:this.pnl
+        pnl: this.pnl,
       });
       if (this.auto) {
-        this.resetOrder();
+        this.resetOrder(currentPrice);
       }
     }
+    if (this.buyOrder == null && this.sellOrder == null) {
+      this.createNewTpLimitOrder(currentPrice);
+    }
   }
-  checkAndPerfomOrderBuyOrSell(order) {
-    if (
-      order.type === "buy" &&
-      !order.filled &&
-      PriceManager.currentPrice <= order.price
-    ) {
-      order.fill(PriceManager.currentPrice);
-      console.log(order,"orderFilled -- ")
-
+  checkAndPerfomOrderBuyOrSell(order, currentPrice) {
+    if (order.type === "buy" && !order.filled && currentPrice <= order.price) {
+      order.fill(currentPrice);
+      console.log(order, "orderFilled -- ");
     } else if (
       order.type === "sell" &&
       !order.filled &&
-      PriceManager.currentPrice >= order.price
+      currentPrice >= order.price
     ) {
-      order.fill(PriceManager.currentPrice);
-      console.log(order,PriceManager.currentPrice)
+      order.fill(currentPrice);
+      console.log(order, currentPrice);
     }
 
     // If the buy order is filled, check if sell conditions are met
     // order.checkAndCreateSell(currentPrice);
   }
 
-  createNewTpLimitOrder() {
+  createNewTpLimitOrder(currentPrice) {
     let orderInfo = {
       type: "buy",
       price: this.buyPrice,
       quantity: this.quantity,
+      feeRate: this.buyerFeeRate,
     };
-    this.buyOrder = this.orderManager.CreateNewOrder(orderInfo.type, orderInfo.price, orderInfo.quantity);
+    this.buyOrder = this.orderManager.CreateNewOrder(
+      orderInfo.type,
+      orderInfo.price,
+      orderInfo.quantity
+    );
     this.sellOrder = null;
     console.log(
-      `New buy order created at price: ${PriceManager.currentPrice} to buy at ${this.buyPrice}`
+      `New buy order created at price: ${currentPrice} to buy at ${this.buyPrice}`
     );
     console.log(this.buyOrder);
   }
 
-  resetOrder() {
-    this.createNewTpLimitOrder(PriceManager.currentPrice);
+  resetOrder(currentPrice) {
+    this.createNewTpLimitOrder(currentPrice);
   }
 }
 
@@ -258,7 +305,7 @@ class OrderManager extends EventDispatcher {
   }
 
   onPriceChange(currentPrice) {
-   // console.log(currentPrice," price change ")
+    // console.log(currentPrice," price change ")
     this.orders.forEach((order) => {
       if (
         order.type === "buy" &&
@@ -266,15 +313,14 @@ class OrderManager extends EventDispatcher {
         currentPrice >= order.price
       ) {
         order.fill(currentPrice);
-        console.log(order,"orderFilled -- ")
-
+        console.log(order, "orderFilled -- ");
       } else if (
         order.type === "sell" &&
         !order.filled &&
         currentPrice >= order.price
       ) {
         order.fill(currentPrice);
-        console.log(order,"orderFilled")
+        console.log(order, "orderFilled");
       }
 
       // If the buy order is filled, check if sell conditions are met
@@ -304,23 +350,16 @@ class Grid {
     this.cryptoName = cryptoName;
     this.averagePrice = (upperPrice - lowerPrice) / gridQuantity;
     this.amountPerGrid =
-      totalAmountUSDT / gridQuantity / ((upperPrice + lowerPrice) / 2);
+      totalAmountUSDT /
+      ((lowerPrice + (upperPrice - (upperPrice - lowerPrice) / gridQuantity)) /
+        2) /
+      gridQuantity;
+    this.currentPrice = 0;
     this.orderManager = orderManager;
-
-    this.gridLevels = this.calculateGridLevels();
-    this.activeOrders = this.gridLevels.map(
-      (level) =>
-        new AdvancedOrder({
-          quantity: this.amountPerGrid,
-          sellPrice: level + this.averagePrice,
-          buyPrice: level,
-          auto: true,
-          orderManager: this.orderManager,
-        })
-    );
+    this.botStarted = false;
 
     // Initialize profit calculations
-    this.profitPerGrid = this.calculateProfitPerGrid();
+    //this.profitPerGrid = this.calculateProfitPerGrid();
     this.totalPnL = 0;
     this.unpairedPnL = 0;
     this.investmentAmount = totalAmountUSDT;
@@ -334,6 +373,20 @@ class Grid {
     }
     return gridLevels;
   }
+  initGrid() {
+    this.gridLevels = this.calculateGridLevels();
+    this.activeOrders = this.gridLevels.map(
+      (level) =>
+        new AdvancedOrder({
+          quantity: this.amountPerGrid,
+          sellPrice: level + this.averagePrice,
+          buyPrice: level,
+          auto: true,
+          orderManager: this.orderManager,
+          currentPrice: this.lastPrice,
+        })
+    );
+  }
 
   // Method to calculate profit per grid
   calculateProfitPerGrid() {
@@ -341,6 +394,7 @@ class Grid {
       const sellPrice = order.sellPrice;
       const buyPrice = order.buyPrice;
       const profitPerGrid = (sellPrice - buyPrice) * order.quantity;
+
       return {
         gridLevel: buyPrice,
         sellPrice,
@@ -361,43 +415,57 @@ class Grid {
     const days = Math.floor(ms / (1000 * 60 * 60 * 24));
 
     return days > 0
-      ? `${days}d ${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
-      : `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+      ? `${days}d ${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+          .toString()
+          .padStart(2, "0")}`
+      : `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+          .toString()
+          .padStart(2, "0")}`;
   }
 
   updatePnL(currentPrice) {
     this.totalPnL = this.orderManager.ordersBnS.reduce((total, orderBnS) => {
-     /*  if (order.filled) {
+      /*  if (order.filled) {
         return total + (order.type === 'sell' ? Number(order.filledAt) - Number(order.price) : 0);
       } */
       if (orderBnS.sellOrder.filled) {
-        return total + orderBnS.pnl
+        return total + orderBnS.pnl;
       }
       return total;
     }, 0);
 
     this.unpairedPnL = this.activeOrders.reduce((total, order) => {
       if (order.buyOrder.filled && !order.sellOrder.filled) {
-        return total + ((Number(currentPrice)) * Number(order.buyOrder.quantity))-( (Number(order.buyOrder.filledAt)) * Number(order.buyOrder.quantity));
+        return (
+          total +
+          Number(currentPrice) * Number(order.buyOrder.quantity) -
+          Number(order.buyOrder.filledAt) * Number(order.buyOrder.quantity)
+        );
       }
       return total;
     }, 0);
   }
-   usdtUsed(){
+  usdtUsed() {
     return this.activeOrders.reduce((total, order) => {
-    if (order.buyOrder.filled && !order.sellOrder.filled) {
-      return total + (Number(order.buyOrder.filledAt)) * Number(order.buyOrder.quantity);
-    }
-    return total;
-  }, 0)}
+      if (order.buyOrder.filled && !order.sellOrder.filled) {
+        return (
+          total +
+          Number(order.buyOrder.filledAt) * Number(order.buyOrder.quantity)
+        );
+      }
+      return total;
+    }, 0);
+  }
   getGridSummary(currentPrice) {
     this.updatePnL(currentPrice); // Update PnL based on the current price
 
     const currentHoldings = {
-      crypto: this.activeOrders.reduce((total, order) => total + (order.buyOrder.filled ? order.quantity:0), 0),
+      crypto: this.activeOrders.reduce(
+        (total, order) => total + (order.buyOrder.filled ? order.quantity : 0),
+        0
+      ),
       usdtFree: this.totalAmountUSDT - this.usdtUsed(),
-      usdtUsed:this.usdtUsed(),
-     
+      usdtUsed: this.usdtUsed(),
     };
 
     const priceRange = {
@@ -432,7 +500,9 @@ class Grid {
       },
       totalPnL: {
         total: `${this.totalPnL.toFixed(8)} USDT`,
-        percentage: `${((this.totalPnL / this.investmentAmount) * 100).toFixed(2)}%`,
+        percentage: `${((this.totalPnL / this.investmentAmount) * 100).toFixed(
+          2
+        )}%`,
         gridProfit: `${this.totalPnL.toFixed(4)} USDT`,
         unpairedPnL: `${this.unpairedPnL.toFixed(4)} USDT`,
         investmentAmount: `${this.investmentAmount.toFixed(4)} USDT`,
@@ -440,10 +510,10 @@ class Grid {
           crypto: "0.00 " + this.cryptoName,
           usdt: "0.00 USDT",
         },
-      },  
+      },
       currentHoldings: {
         crypto: currentHoldings.crypto.toFixed(4),
-        valueInUSDT:this.usdtUsed().toFixed(4) + ` USDT`,
+        valueInUSDT: this.usdtUsed().toFixed(4) + ` USDT`,
         initial: {
           crypto: "0 " + this.cryptoName,
           usdt: `${this.investmentAmount.toFixed(4)} USDT`,
@@ -452,13 +522,17 @@ class Grid {
       priceRange: priceRange,
       conditions: conditions,
       executionOverview: {
-        totalExecutions: this.orderManager.orders.filter(order => order.filled).length,
+        totalExecutions: this.orderManager.orders.filter(
+          (order) => order.filled
+        ).length,
         totalArbitrageTimes: 1,
         gridOrderDetails: {
           lastPrice: `${currentPrice}`,
           amountPerGrid: `${this.amountPerGrid.toFixed(4)} ${this.cryptoName}`,
-          buyOrders: this.orderManager.getOrdersByStatus("open", "buy").buyOrders.length,
-          sellOrders: this.orderManager.getOrdersByStatus("open", "sell").sellOrders.length,
+          buyOrders: this.orderManager.getOrdersByStatus("open", "buy")
+            .buyOrders.length,
+          sellOrders: this.orderManager.getOrdersByStatus("open", "sell")
+            .sellOrders.length,
         },
       },
       orderHistory: this.orderManager.viewOrderHistory(),
@@ -467,10 +541,15 @@ class Grid {
   }
 
   updatePrice(currentPrice) {
+    if (!this.gridStarted) {
+      this.initGrid();
+      this.gridStarted = true;
+    }
+
     this.activeOrders.forEach((order) => {
       order.checkAndCreateSell(currentPrice);
     });
-    this.lastPrice = currentPrice;
+    this.currentPrice = this.lastPrice = currentPrice;
   }
 
   viewOrders() {
@@ -483,7 +562,6 @@ class Grid {
   }
 }
 
-
 ``;
 class PriceManager extends EventDispatcher {
   static Events = {
@@ -492,9 +570,9 @@ class PriceManager extends EventDispatcher {
     COMPLETED: "completed", // Event for normal completion
     STOPPED: "stopped", // Event for forced stop
   };
-  
-   static #currentPrice = 0;
-   static #time = 0;
+
+  static #currentPrice = 0;
+  static #time = 0;
   // Static getter for the currentPrice
   static get currentPrice() {
     return PriceManager.#currentPrice;
@@ -502,9 +580,8 @@ class PriceManager extends EventDispatcher {
   static get time() {
     return PriceManager.#time;
   }
-  
+
   constructor(initialPrice) {
-    
     super(); // Call the parent constructor
     this.price = initialPrice;
     this.minPercentChange = -0.02; // Minimum fluctuation percentage (-0.5%)
@@ -512,11 +589,10 @@ class PriceManager extends EventDispatcher {
     this.priceLoop = null;
     this.startTime = null;
     this.elapsedMs = 0; // Track elapsed milliseconds
-    this._time=Date.now();
-    this.updatePrice() 
+    this._time = Date.now();
+    this.updatePrice();
 
     console.log(this, PriceManager.currentPrice, PriceManager.time);
-      
   }
 
   // Method to update the price with a random fluctuation
@@ -525,21 +601,19 @@ class PriceManager extends EventDispatcher {
       (Math.random() * (this.maxPercentChange - this.minPercentChange) +
         this.minPercentChange) /
       100;
-   this.price = parseFloat(
-      (this.price * (1 + percentChange)).toFixed(8)
-    ); // Keep two decimal points
+    this.price = parseFloat((this.price * (1 + percentChange)).toFixed(8)); // Keep two decimal points
 
-    this.price=Number(this.price.toFixed(8))
+    this.price = Number(this.price.toFixed(8));
     // Get current time
     //const currentTime = new Date().toISOString(); // Use ISO format for the timestamp
-    PriceManager.#currentPrice=this.price;
-    PriceManager.#time=this._time;
+    PriceManager.#currentPrice = this.price;
+    PriceManager.#time = this._time;
     // Dispatch the priceChanged event with the current price and timestamp
     this.dispatchEvent(PriceManager.Events.PRICE_CHANGED, {
       price: this.price,
       time: this._time,
     }); // Notify the 'priceChanged' event
-   // this.time=currentTime;
+    // this.time=currentTime;
   }
 
   // Helper to convert time format to milliseconds
@@ -572,14 +646,17 @@ class PriceManager extends EventDispatcher {
     const minutes = Math.floor((ms / (1000 * 60)) % 60);
     const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
     const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  
+
     if (days > 0) {
-      return `${days}d ${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`; // Dd HH:MM:SS
+      return `${days}d ${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`; // Dd HH:MM:SS
     } else {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`; // HH:MM:SS
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`; // HH:MM:SS
     }
   }
-  
 
   // Start the price fluctuation loop with flexible intervals and a target time
   start(interval = 1000, targetTime = "1m", speedMultiplier = 1) {
@@ -587,20 +664,17 @@ class PriceManager extends EventDispatcher {
 
     // Calculate adjusted target duration based on speed multiplier
     const targetDuration = this.parseTimeInterval(targetTime);
-    this.startTime =this._time;
-   // this._time=this.startTime;
+    this.startTime = this._time;
+    // this._time=this.startTime;
     this.elapsedMs = 0; // Reset elapsed milliseconds
 
     // Begin loop
     this.priceLoop = setInterval(() => {
       this.elapsedMs += interval * speedMultiplier; // Increment elapsed time by interval multiplied by speed
-      this._time=this.startTime+this.elapsedMs;
+      this._time = this.startTime + this.elapsedMs;
       if (this.elapsedMs >= targetDuration) {
         this.stop(); // Stop the loop when adjusted target time is reached
-        this.dispatchEvent(
-          PriceManager.Events.COMPLETED,
-          this.createDummyValue()
-        ); // Dispatch completed event
+        this.dispatchEvent(PriceManager.Events.COMPLETED, this.onCompelete()); // Dispatch completed event
         console.log("Target duration reached. Stopping price updates.");
       } else {
         this.updatePrice(); // Update price at each interval
@@ -622,7 +696,7 @@ class PriceManager extends EventDispatcher {
     const breakDuration = this.parseTimeInterval(breakTime);
 
     this.startTime = Date.now();
-    this._time=this.startTime;
+    this._time = this.startTime;
     this.elapsedMs = 0; // Reset elapsed time
     let batchs = 0;
 
@@ -635,21 +709,22 @@ class PriceManager extends EventDispatcher {
       while (iterations < maxIterations) {
         this.updatePrice(); // Update price per iteration
         this.elapsedMs += interval;
-        this._time=this.startTime+this.elapsedMs;
+        this._time = this.startTime + this.elapsedMs;
         iterations++;
 
         // Check if we've reached the target duration during this batch
         if (this.elapsedMs >= targetDuration) {
           this.stop();
-          this.dispatchEvent(
-            PriceManager.Events.COMPLETED,
-            this.createDummyValue()
-          ); // Dispatch completed event
+          this.dispatchEvent(PriceManager.Events.COMPLETED, this.onCompelete()); // Dispatch completed event
           console.log("Target duration reached. Stopping price updates.");
           return; // Exit if target duration is reached
         }
       }
-      console.log(`Batch complete ${batchs}, ${this.price} ,${new Date(PriceManager.time).toDateString()}`);
+      console.log(
+        `Batch complete ${batchs}, ${this.price} ,${new Date(
+          PriceManager.time
+        ).toDateString()}`
+      );
 
       // Schedule the next batch with a break time
       setTimeout(processBatch, breakDuration);
@@ -659,7 +734,7 @@ class PriceManager extends EventDispatcher {
   }
 
   // Create a dummy value upon completion
-  createDummyValue() {
+  onCompelete() {
     return {
       finalPrice: this.price,
       elapsedTime: this.formatElapsedTime(this.elapsedMs), // Format elapsed time
@@ -689,13 +764,12 @@ const orderManager = new OrderManager();
 const gridBot = new Grid({
   lowerPrice: 0.001,
   upperPrice: 0.002,
-  gridQuantity: 5,
+  gridQuantity: 10,
   totalAmountUSDT: 10,
   creationPrice: 0.0015,
   lastPrice: 0.0015,
   orderManager: orderManager,
 });
-
 
 // Add an event listener for price changes
 priceManager.addEventListener(
@@ -704,14 +778,15 @@ priceManager.addEventListener(
     // console.log(`Price updated: $${price} at ${time}`);
     //orderManager.onPriceChange(price);
     gridBot.updatePrice(price); // Fills buy orders if price is at or below buy levels
-
   }
 );
 
 // Add event listener for completion
-priceManager.addEventListener(PriceManager.Events.COMPLETED, (dummy) => {
+priceManager.addEventListener(PriceManager.Events.COMPLETED, (result) => {
   console.log(
-    `Price fluctuation completed. Final price: $${dummy.finalPrice.toFixed(8)}. Elapsed time: ${dummy.elapsedTime}. Message: ${dummy.message}`
+    `Price fluctuation completed. Final price: $${result.finalPrice.toFixed(
+      8
+    )}. Elapsed time: ${result.elapsedTime}. Message: ${result.message}`
   );
   console.log(gridBot.viewOrders());
   console.log(gridBot.getGridSummary(PriceManager.currentPrice));

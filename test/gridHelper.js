@@ -2,7 +2,7 @@ class Grid {
     constructor({
       lowerPrice = 0.0010,
       upperPrice = 0.0020,
-      gridQuantity = 5,
+      gridQuantity = 10,
       totalAmountUSDT = 10,
       creationPrice = 0.0015,
       lastPrice = 0.0015
