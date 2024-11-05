@@ -55,6 +55,7 @@ class CryptoOrder {
     this.takeProfit = takeProfit;
     this.filled = false;
     this.feeRate = feeRate;
+    this.totalCost = Number(this.quantity * this.price).toFixed(8);
 
     this.fee = Number(
       this.type !== "buy"
@@ -76,6 +77,7 @@ class CryptoOrder {
       } filled at price: ${currentPrice} of fill Price ${this.price}`
     );
     this.filledAt = currentPrice;
+    this.totalCost = Number(this.quantity * this.filledAt).toFixed(8);
   }
 }
 
@@ -755,7 +757,7 @@ class PriceManager extends EventDispatcher {
 }
 
 // Example usage:
-const priceManager = new PriceManager(0.0015); // Initial price of $100
+//const priceManager = new PriceManager(0.0015); // Initial price of $100
 
 // Instantiate the OrderManager
 const orderManager = new OrderManager();
@@ -770,7 +772,15 @@ const gridBot = new Grid({
   lastPrice: 0.0015,
   orderManager: orderManager,
 });
-
+gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders  
+gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders
 // Add an event listener for price changes
 priceManager.addEventListener(
   PriceManager.Events.PRICE_CHANGED,
