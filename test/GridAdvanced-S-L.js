@@ -450,16 +450,18 @@ class Grid {
         this.lastPrice = lastPrice;
         this.startTime = PriceManager.time;
         this.cryptoName = cryptoName;
-        this.averagePrice = (upperPrice - lowerPrice) / gridQuantity;
-        this.amountPerGrid =
-            totalAmountUSDT /
-            ((lowerPrice + (upperPrice - (upperPrice - lowerPrice) / gridQuantity)) /
-                2) /
-            gridQuantity;
+        this.position = position;        
+        this.marginRate=0.3546;
+        this.margin=totalAmountUSDT*this.marginRate;
+        this.totalAmountUSDTLessMargin = totalAmountUSDT - this.margin;
+        this.priceDifference = (upperPrice - lowerPrice) / gridQuantity;
+        
+        this.averagePrice=((this.position === "long" ? (lowerPrice + (this.upperPrice  - this.priceDifference)) : (lowerPrice + this.priceDifference)+ upperPrice ) /
+        2);
+        this.amountPerGrid = Math.round( this.totalAmountUSDTLessMargin / this.averagePrice/gridQuantity);
         this.currentPrice = 0;
         this.orderManager = orderManager;
         this.botStarted = false;
-        this.position = position;
 
         // Initialize profit calculations
         //this.profitPerGrid = this.calculateProfitPerGrid();
@@ -872,26 +874,52 @@ class PriceManager extends EventDispatcher {
 // Instantiate the OrderManager
 const orderManager = new OrderManager();
 
+
+
+/* const gridBot = new Grid({
+  lowerPrice: 0.016,
+  upperPrice: 0.0163,
+  gridQuantity: 10,
+  totalAmountUSDT: 100,
+  creationPrice: 0.01654,
+  lastPrice: 0.01654,
+  orderManager: orderManager,
+  position: "short"
+});
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01656); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders  
+gridBot.updatePrice(0.01653); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders */
 // Example usage
 const gridBot = new Grid({
-    lowerPrice: 0.0145,
-    upperPrice: 0.0175,
-    gridQuantity: 150,
-    totalAmountUSDT: 300,
-    creationPrice: 0.01629,
-    lastPrice: 0.01629,
+    lowerPrice: 0.01655,
+    upperPrice: 0.01657,
+    gridQuantity: 10,
+    totalAmountUSDT: 1000,
+    creationPrice: 0.01654,
+    lastPrice: 0.01654,
     orderManager: orderManager,
     position: "short"
 });
-gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders  
-gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01656); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders  
+gridBot.updatePrice(0.01653); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders
+console.log(gridBot.viewOrders());
+    console.log(gridBot.getGridSummary(PriceManager.currentPrice));
+
+
+
 // Add an event listener for price changes
 priceManager.addEventListener(
     PriceManager.Events.PRICE_CHANGED,

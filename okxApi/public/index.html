@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OKX Real-Time Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    #data-container {
+      width: 80%;
+      margin: 40px auto;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>OKX Real-Time Data</h1>
+  <div id="data-container">
+    <h2>Instrument: BTC-USDT-SWAP</h2>
+    <ul id="data-list">
+      <!-- data will be displayed here -->
+    </ul>
+  </div>
+
+  <script>
+    const url = 'ws://localhost:8080';
+    const dataList = document.getElementById('data-list');
+
+    const socket = new WebSocket(url);
+
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+      socket.send(JSON.stringify({
+        op: 'subscribe',
+        args: [
+          'instruments:BTC-USDT-SWAP-CANDLE_PERIOD_1m'
+        ]
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      const jsonData = JSON.parse(event.data);
+      if (jsonData.success) {
+        const instrumentData = jsonData.args[0];
+        const price = instrumentData.price;
+        const timestamp = instrumentData.timestamp;
+        data.push({ price, timestamp });
+      }
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    setInterval(() => {
+      fetch('http://localhost:3008/data', {
+        mode: 'cors',
+        headers: {
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+        .then(response => response.json())
+        .then(data => {
+          dataList.innerHTML = '';
+          data.forEach(item => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `Price: ${item.price} | Timestamp: ${item.timestamp}`;
+            dataList.appendChild(listItem);
+          });
+        });
+    }, 1000);
+  </script>
+</body>
+</html>

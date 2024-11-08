@@ -778,7 +778,7 @@ class PriceManager extends EventDispatcher {
 const orderManager = new OrderManager();
 
 // Example usage
-const gridBot = new Grid({
+/* const gridBot = new Grid({
   lowerPrice: 0.001,
   upperPrice: 0.002,
   gridQuantity: 10,
@@ -795,7 +795,30 @@ gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders
 gridBot.updatePrice(0.0018); // Checks sell conditions for filled buy orders
 gridBot.updatePrice(0.0017); // Checks sell conditions for filled buy orders
 gridBot.updatePrice(0.0019); // Checks sell conditions for filled buy orders
-gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.0020); // Checks sell conditions for filled buy orders */
+
+
+const gridBot = new Grid({
+  lowerPrice: 0.016,
+  upperPrice: 0.0163,
+  gridQuantity: 10,
+  totalAmountUSDT: 100,
+  creationPrice: 0.01654,
+  lastPrice: 0.01654,
+  orderManager: orderManager,
+  position: "short"
+});
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01656); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders  
+gridBot.updatePrice(0.01653); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01654); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01652); // Checks sell conditions for filled buy orders
+gridBot.updatePrice(0.01659); // Checks sell conditions for filled buy orders
+console.log(gridBot.viewOrders());
+  console.log(gridBot.getGridSummary(PriceManager.currentPrice));
 // Add an event listener for price changes
 priceManager.addEventListener(
   PriceManager.Events.PRICE_CHANGED,
