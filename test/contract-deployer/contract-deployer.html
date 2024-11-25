@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deploy Contract with MetaMask</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #deployBtn { margin-top: 20px; }
+    #output { margin-top: 20px; }
+    .input-field { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Deploy Contract with MetaMask</h1>
+
+  <!-- File Input for Contract JSON -->
+  <input type="file" id="contractJsonFile" accept=".json" />
+  <br><br>
+
+  <!-- Constructor Parameters Form -->
+  <div id="constructorFields"></div>
+
+  <!-- Deploy Button -->
+  <button id="deployBtn" disabled>Deploy Contract</button>
+
+  <div id="output"></div>
+
+  <script>
+    // Ensure MetaMask is available
+    console.log(window.ethereum)
+    if (typeof window.ethereum === 'undefined') {
+      document.getElementById('output').innerHTML = 'Please install MetaMask!';
+      
+    }
+
+    // Define variables
+    let contractABI;
+    let contractBytecode;
+    let constructorInputs = [];
+
+    // Get MetaMask provider and connect to network
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    let signer;
+
+    async function connectMetaMask() {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      signer = provider.getSigner();
+      document.getElementById('deployBtn').disabled = false; // Enable deploy button after MetaMask connection
+    }
+
+    // Listen for file input to load contract JSON
+    document.getElementById('contractJsonFile').addEventListener('change', handleFileUpload);
+
+    async function handleFileUpload(event) {
+      const file = event.target.files[0];
+      console.log(file)
+      if (file && file.name.endsWith('.json')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const jsonData = JSON.parse(e.target.result);
+            console.log(jsonData)
+            contractABI = jsonData.abi;
+            contractBytecode = jsonData.bytecode;
+            console.log(contractABI, contractBytecode )
+
+            // Extract constructor inputs from ABI
+            const constructor = contractABI.find(item => item.type === 'constructor');
+            if (constructor) {
+              constructorInputs = constructor.inputs;
+              generateConstructorForm();
+            }
+
+            document.getElementById('output').innerHTML = 'Contract JSON loaded. Ready to deploy!';
+          } catch (error) {
+            document.getElementById('output').innerHTML = 'Invalid contract JSON!';
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        document.getElementById('output').innerHTML = 'Please upload a valid contract JSON file!';
+      }
+    }
+
+    // Generate input fields for constructor parameters dynamically
+    function generateConstructorForm() {
+      const constructorFieldsDiv = document.getElementById('constructorFields');
+      constructorFieldsDiv.innerHTML = ''; // Clear any existing fields
+
+      constructorInputs.forEach((input, index) => {
+        const inputField = document.createElement('div');
+        inputField.classList.add('input-field');
+        inputField.innerHTML = `
+          <label for="param-${index}">${input.name} (${input.type}):</label>
+          <input type="text" id="param-${index}" placeholder="Enter ${input.name}" required />
+        `;
+        constructorFieldsDiv.appendChild(inputField);
+      });
+    }
+
+    // Handle contract deployment
+    async function deployContract() {
+      if (!contractABI || !contractBytecode) {
+        alert('Please load a valid contract JSON first!');
+        return;
+      }
+
+      // Gather constructor parameters from the form
+      const constructorArgs = [];
+      for (let i = 0; i < constructorInputs.length; i++) {
+        const paramValue = document.getElementById(`param-${i}`).value;
+        if (!paramValue) {
+          alert(`Please enter value for ${constructorInputs[i].name}`);
+          return;
+        }
+
+        // Convert the parameter to the correct type
+        switch (constructorInputs[i].type) {
+          case 'address':
+            constructorArgs.push(ethers.utils.getAddress(paramValue));
+            break;
+          case 'uint256':
+            constructorArgs.push(ethers.BigNumber.from(paramValue));
+            break;
+          case 'string':
+            constructorArgs.push(paramValue);
+            break;
+          case 'bool':
+            constructorArgs.push(paramValue === 'true');
+            break;
+          default:
+            constructorArgs.push(paramValue);
+            break;
+        }
+      }
+
+      try {
+        // Create a contract factory
+        const contractFactory = new ethers.ContractFactory(contractABI, contractBytecode, signer);
+        
+        // Deploy contract with constructor arguments
+        const contract = await contractFactory.deploy(...constructorArgs);
+        document.getElementById('output').innerHTML = `Contract deployed at address: ${contract.address}`;
+        
+        // Wait for the transaction to be mined
+        await contract.deployTransaction.wait();
+        document.getElementById('output').innerHTML += '<br>Contract successfully deployed!';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('output').innerHTML = 'Deployment failed. Check console for details.';
+      }
+    }
+
+    // Event listener for deploy button
+    document.getElementById('deployBtn').addEventListener('click', deployContract);
+
+    // Prompt user to connect MetaMask if not connected
+    connectMetaMask();
+  </script>
+</body>
+</html>
